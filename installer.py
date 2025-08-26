@@ -67,7 +67,7 @@ arabic_to_english = {
     "ة": "m",
     "’": "M",
     "و": ",",
-    # ",": "<",
+    # "how to edit the : "<",
     "ز": ".",
     ".": ">",
     "ظ": "/",
@@ -102,11 +102,19 @@ def auto_convert(text):
     return result
 
 
-def modify_text(text: str) -> str:
-    return auto_convert(text)
+def translate(text: str) -> str:
+    return text
+    
+    
+def modify_text(text: str, action="key2key") -> str:
+    if action=="translate":
+        return translate(text)
+    elif action=="key2key":
+        return auto_convert(text)
 
-text = pyperclip.paste()
-pyperclip.copy(modify_text(text))
+if len(sys.argv) > 1:
+    text = pyperclip.paste()
+    pyperclip.copy(modify_text(text, sys.argv[1]))
 """
 
 # --------- AHK Script ---------
@@ -115,7 +123,7 @@ AHK_FILE = r"""
 {
     Send("^x")
     ClipWait()
-    RunWait('python.exe "' A_ScriptDir '\modifier_core.py"', , "Hide")
+    RunWait('python.exe "' A_ScriptDir '\modifier_core.py" key2key', , "Hide")
     ClipWait()
     Send(A_Clipboard)
 }
@@ -219,7 +227,6 @@ def create_files():
 
 
 def build_uninstaller(python_cmd):
-    ensure_pyinstaller(python_cmd)
     print("Building uninstaller.exe...")
     subprocess.run(
         [python_cmd, "-m", "PyInstaller", "--onefile", "uninstaller.py"], check=True
@@ -270,9 +277,13 @@ def cleanup_installer_files():
 # --------- Main ---------
 if __name__ == "__main__":
     python_cmd = ensure_python()  # Checks for Python
+
     ensure_package("pyperclip", python_cmd)  # Checks for pyperclip
     ensure_package("psutil", python_cmd)  # Checks for psutil
     ensure_package("pyinstaller", python_cmd)  # Checks for pyinstaller
+
+    # # Translate libraries
+    # ensure_package("translate", python_cmd)  # Checks for translate
 
     create_files()  # Creates core files
     add_to_startup()  # Adds files to the startup
