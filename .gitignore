@@ -1,0 +1,5 @@
+*.ahk
+*.spec
+
+modifier_core.py
+uninstaller.py
