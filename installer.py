@@ -1,33 +1,9 @@
-import os
-import subprocess
-import sys
-import urllib.request
-
-
-# helper function
-def ensure_package(pkg):
-    try:
-        __import__(pkg)
-    except ImportError:
-        print(f"{pkg} not found, installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
-
-
-# نتأكد من المكتبات المهمة
-# ensure_package("pywin32")
-ensure_package("psutil")
-
-# import win32com.client
-import psutil
-
 # --------- modifier_core.py content ---------
 MODIFIER_CORE_FILE = r"""
 import sys
 import pyperclip
 
-# -*- coding: utf-8 -*-
-
-# خريطة الحروف العربية <-> الإنجليزية حسب مكانها على الكيبورد
+# Arabic <-> English map by location on the keyboard
 arabic_to_english = {
     "ض": "q",
     "َ": "Q",
@@ -98,25 +74,34 @@ arabic_to_english = {
     "ّ": "~",
 }
 
-# خريطة الحروف الإنجليزية → العربية
+# English → Arabic alphabet map
 english_to_arabic = {v: k for k, v in arabic_to_english.items()}
 
 
 def auto_convert(text):
-    result = ""
-    for ch in text:
+    def find(ch):
         if ch in arabic_to_english:
-            result += arabic_to_english[ch]
+            return arabic_to_english[ch]
         elif ch in english_to_arabic:
-            result += english_to_arabic[ch]
+            return english_to_arabic[ch]
+        else:
+            return ch
+
+    result = ""
+    for i in range(0, len(text), 2):
+        ch2 = text[i : i + 2]
+        ch = find(ch2)
+        if ch == ch2:
+            for c in ch:
+                result += find(c)
         else:
             result += ch
+
     return result
 
 
 def modify_text(text: str) -> str:
-    return auto_convert(text)  # مثال: تحويل النص لحروف كبيرة
-
+    return auto_convert(text)
 
 text = pyperclip.paste()
 pyperclip.copy(modify_text(text))
@@ -180,6 +165,12 @@ if __name__ == "__main__":
 """
 
 
+import os
+import subprocess
+import sys
+import urllib.request
+
+
 # --------- Installer Functions ---------
 def ensure_python():
     try:
@@ -201,30 +192,18 @@ def ensure_python():
         return "python"
 
 
-def ensure_pyperclip(python_cmd):
+# helper function
+def ensure_package(pkg, python_cmd="python"):
     try:
         subprocess.run(
-            [python_cmd, "-m", "pip", "show", "pyperclip"],
+            [python_cmd, "-m", "pip", "show", pkg],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
     except:
-        print("Installing pyperclip...")
-        subprocess.run([python_cmd, "-m", "pip", "install", "pyperclip"], check=True)
-
-
-def ensure_pyinstaller(python_cmd):
-    try:
-        subprocess.run(
-            [python_cmd, "-m", "pip", "show", "pyinstaller"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except:
-        print("Installing pyinstaller...")
-        subprocess.run([python_cmd, "-m", "pip", "install", "pyinstaller"], check=True)
+        print(f"Installing {pkg}...")
+        subprocess.run([python_cmd, "-m", "pip", "install", pkg], check=True)
 
 
 def create_files():
@@ -235,22 +214,6 @@ def create_files():
     with open("uninstaller.py", "w", encoding="utf-8") as f:
         f.write(UNINSTALLER_FILE)
     print("Created modifier_core.py, modifier.ahk and uninstaller.py")
-
-
-# def compile_ahk_to_exe():
-#     ahk2exe_path = r"C:\\Program Files\\AutoHotkey\\Compiler\\Ahk2Exe.exe"
-#     ahk_script = os.path.abspath("modifier.ahk")
-#     output_exe = os.path.abspath("modifier.exe")
-
-#     if os.path.exists(ahk2exe_path):
-#         subprocess.run(
-#             [ahk2exe_path, "/in", ahk_script, "/out", output_exe], check=True
-#         )
-#         print(f"Compiled modifier.ahk -> modifier.exe")
-#         return output_exe
-#     else:
-#         print("⚠️ Ahk2Exe not found! Please install AutoHotkey with Compiler.")
-#         return None
 
 
 def build_uninstaller(python_cmd):
@@ -268,38 +231,52 @@ def build_uninstaller(python_cmd):
 
 def add_to_startup():
     import shutil
-    # مسار الـ Startup
+
+    # Startup path
     startup_folder = os.path.join(
         os.getenv("APPDATA"), r"Microsoft\Windows\Start Menu\Programs\Startup"
     )
     target_path = os.path.join(startup_folder, "modifier.ahk")
     target_path_py = os.path.join(startup_folder, "modifier_core.py")
 
-    # نسخ ملف ahk للـ Startup
+    # Copy the ahk file to the startup
     shutil.copy("modifier.ahk", target_path)
     shutil.copy("modifier_core.py", target_path_py)
 
     print(f"Program added to Startup: {startup_folder}")
 
 
+# --------- Cleanup Temporary Files ---------
+def cleanup_installer_files():
+    # List of files that Christ has on the way
+    temp_files = [
+        "modifier_core.py",
+        "modifier.ahk",
+        "installer.spec",
+        "uninstaller.py",
+        "uninstaller.spec",
+    ]
+    for f in temp_files:
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+                print(f"Deleted temporary file: {f}")
+            except Exception as e:
+                print(f"Could not delete {f}: {e}")
+
+
 # --------- Main ---------
 if __name__ == "__main__":
-    python_cmd = ensure_python()
-    ensure_pyperclip(python_cmd)
-    create_files()
-    build_uninstaller(python_cmd)
+    python_cmd = ensure_python()  # Checks for Python
+    ensure_package("pyperclip", python_cmd)  # Checks for pyperclip
+    ensure_package("psutil", python_cmd)  # Checks for psutil
+    ensure_package("pyinstaller", python_cmd)  # Checks for pyinstaller
 
-    add_to_startup()
-    print(
-        "✅ Setup complete! modifier.exe is compiled and will auto-start with Windows."
-    )
-    # exe_path = compile_ahk_to_exe()
-    # if exe_path:
-    #     # add_shortcut_to_startup(exe_path)
-    #     print(
-    #         "✅ Setup complete! modifier.exe is compiled and will auto-start with Windows."
-    #     )
-    # else:
-    #     print(
-    #         "❌ Could not compile modifier.ahk to exe. Install AutoHotkey with Ahk2Exe and retry."
-    #     )
+    create_files()  # Creates core files
+    add_to_startup()  # Adds files to the startup
+    build_uninstaller(python_cmd)  # Creates uninstaller.exe
+
+    # After all, we delete temporary files.
+    cleanup_installer_files()
+
+    print("✅ Setup complete! Program is ready and files are cleaned up.")
